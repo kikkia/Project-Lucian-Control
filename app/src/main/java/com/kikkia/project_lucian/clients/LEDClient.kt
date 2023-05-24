@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kikkia.project_lucian.enums.LEDController
+import com.kikkia.project_lucian.models.LEDState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +18,7 @@ import org.json.JSONObject
 import java.lang.Exception
 
 sealed class RequestResult {
-    data class Success(val data: String) : RequestResult()
+    data class Success(val data: LEDState) : RequestResult()
     data class Error(val error: Throwable) : RequestResult()
 }
 
@@ -37,7 +38,7 @@ class LEDClient : ViewModel() {
             val response = withContext(Dispatchers.IO) {
                 try {
                     httpClient.newCall(request).execute().use { response -> respJson = JSONObject(response.body?.string()) }
-                    _requestResult.value = RequestResult.Success(respJson.toString())
+                    _requestResult.value = RequestResult.Success(LEDState.fromJSON(controller, respJson))
                 } catch(e: Exception) {
                     _requestResult.value = RequestResult.Error(e)
                 }

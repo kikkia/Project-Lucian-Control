@@ -8,18 +8,22 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +39,8 @@ import com.kikkia.project_lucian.clients.LEDClient
 import com.kikkia.project_lucian.clients.RequestResult
 import com.kikkia.project_lucian.enums.LEDController
 import com.kikkia.project_lucian.ui.theme.ProjectlucianTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     val LEDClient = LEDClient()
@@ -102,20 +108,21 @@ fun MyButtonWithViewModel() {
     }
 
     // Compose UI components
-    Column {
+    Column( modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.Center) {
         Button(
             onClick = {
                 viewModel.getState(LEDController.LASER)
             },
             modifier = Modifier.padding(16.dp)
         ) {
-            Text("Send Request")
+            Text("Send Request", modifier = Modifier.padding(2.dp))
         }
 
         when (val result = requestResult) {
             is RequestResult.Success -> {
                 // Handle success case
-                respText = result.data
+                respText = result.data.toString()
             }
             is RequestResult.Error -> {
                 // Handle error case
@@ -124,10 +131,15 @@ fun MyButtonWithViewModel() {
             else -> {
             }
         }
-
-        Text(text = respText)
+        Row(modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(.1f)) {
+            Text(text = respText, Modifier.padding(2.dp))
+        }
         ImageButtons()
+        StatusIndicators()
     }
+
 }
 
 @Composable
@@ -140,14 +152,20 @@ fun ImageButtons() {
     )
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(0.1f),
         horizontalArrangement = Arrangement.Center
     ) {
         for (image in imageList) {
             Image(
                 painter = painterResource(id = image),
                 contentDescription = null,
-                modifier = Modifier.scale(3f).weight(1f).padding(8.dp),
+                modifier = Modifier
+                    .scale(3f)
+                    .weight(1f)
+                    .padding(8.dp)
+                    .wrapContentSize(),
                 contentScale = ContentScale.Fit
             )
         }
@@ -179,4 +197,40 @@ fun GreetingPreview() {
 
 fun onNightModeChange(enabled: Boolean) {
 
+}
+
+@Composable
+fun StatusIndicators() {
+    val viewModel = LEDClient()
+    val coroutineScope = rememberCoroutineScope()
+    val requestResult by viewModel.requestResult.collectAsState()
+    var statusText by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(5000) // Delay between button clicks (5 seconds in this example)
+            coroutineScope.launch {
+                // TODO: Get status of all controllers
+                viewModel.getState(LEDController.LASER)
+            }
+        }
+    }
+
+    when (val result = requestResult) {
+        is RequestResult.Success -> {
+            // Handle success case
+            statusText = result.data.toString()
+        }
+        is RequestResult.Error -> {
+            // Handle error case
+            statusText = result.error.message ?: "Unknown error occurred"
+        }
+        else -> {
+        }
+    }
+
+    Text(
+        modifier = Modifier.padding(16.dp),
+        text = statusText
+    )
 }
