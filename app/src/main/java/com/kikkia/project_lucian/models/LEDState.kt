@@ -18,5 +18,9 @@ data class LEDState(val controller: LEDController,
                              json.getInt("pl") == 0
             )
         }
+
+        fun blank() : LEDState {
+            return LEDState(LEDController.LASER, 0, false, 0, false)
+        }
     }
 }

@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,23 +30,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.SemanticsActions.OnClick
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
+import com.kikkia.project_lucian.clients.GetAllRequestResult
+import com.kikkia.project_lucian.clients.GetRequestResult
 import com.kikkia.project_lucian.clients.LEDClient
-import com.kikkia.project_lucian.clients.RequestResult
+import com.kikkia.project_lucian.enums.AnimationStates
 import com.kikkia.project_lucian.enums.LEDController
 import com.kikkia.project_lucian.ui.theme.ProjectlucianTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-    val LEDClient = LEDClient()
-    val LEDStatusText = ""
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -55,7 +56,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    UI("Android")
+                    UI()
                 }
             }
         }
@@ -63,92 +64,33 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun UI(name: String, modifier: Modifier = Modifier) {
-    var count by remember {
-        mutableStateOf(0)
-    }
+fun UI(modifier: Modifier = Modifier) {
     Column(verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxSize()) {
-        Button(onClick = { count-- }) {
-            Text(
-                text = "Hello $name!",
-                modifier = modifier,
-                color = Color.Black,
-                fontSize = 20.sp,
-            )
-        }
-        Button(onClick = { count++ }) {
-            Text(
-                text = "Hello Lucian!",
-                modifier = modifier,
-                color = Color.Black,
-                fontSize = 20.sp,
-            )
-        }
-        Text(text = count.toString(), color = Color.White, fontSize = 15.sp)
-        MyButtonWithViewModel()
+        MyButtonWithViewModel(LEDClient())
     }
 }
 
 // Create a Composable function for the UI
 @Composable
-fun MyButtonWithViewModel() {
-    // Create an instance of the ViewModel
-    val viewModel = LEDClient()
-    val requestResult by viewModel.requestResult.collectAsState()
-    var respText by remember {
-        mutableStateOf("")
-    }
-
-
-    // Create a state to hold the response message
-    var responseMessage by remember {
-        mutableStateOf("")
-    }
-
+fun MyButtonWithViewModel(viewModel: LEDClient) {
     // Compose UI components
     Column( modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.Center) {
-        Button(
-            onClick = {
-                viewModel.getState(LEDController.LASER)
-            },
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text("Send Request", modifier = Modifier.padding(2.dp))
-        }
-
-        when (val result = requestResult) {
-            is RequestResult.Success -> {
-                // Handle success case
-                respText = result.data.toString()
-            }
-            is RequestResult.Error -> {
-                // Handle error case
-                respText = result.error.message ?: "Unknown error occurred"
-            }
-            else -> {
-            }
-        }
-        Row(modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(.1f)) {
-            Text(text = respText, Modifier.padding(2.dp))
-        }
-        ImageButtons()
+        ImageButtons(viewModel)
+        basicControlButtons()
         StatusIndicators()
     }
-
 }
 
 @Composable
-fun ImageButtons() {
+fun ImageButtons(client: LEDClient) {
     val imageList = listOf(
-        R.drawable.lightslinger,
-        R.drawable.piercing_light,
-        R.drawable.ardent_blaze,
-        R.drawable.the_culling
+        Pair(R.drawable.lightslinger, AnimationStates.IDLE),
+        Pair(R.drawable.piercing_light, AnimationStates.LASER),
+        Pair(R.drawable.ardent_blaze, AnimationStates.BIGSHOT),
+        Pair(R.drawable.the_culling, AnimationStates.ULTIMATE)
     )
 
     Row(
@@ -157,38 +99,83 @@ fun ImageButtons() {
             .fillMaxHeight(0.1f),
         horizontalArrangement = Arrangement.Center
     ) {
-        for (image in imageList) {
+        for (pair in imageList) {
             Image(
-                painter = painterResource(id = image),
+                painter = painterResource(id = pair.first),
                 contentDescription = null,
                 modifier = Modifier
                     .scale(3f)
                     .weight(1f)
                     .padding(8.dp)
-                    .wrapContentSize(),
-                contentScale = ContentScale.Fit
+                    .wrapContentSize()
+                    .clickable {
+                        for (controller in LEDController.values()) {
+                            client.setPlaylist(controller, pair.second)
+                        }
+                    },
+                contentScale = ContentScale.Fit,
             )
         }
     }
 }
 
 @Composable
-fun controllerStateUI() {
-    // TODO: Update all states of each controller programmatically on a period.
+fun basicControlButtons() {
+    val viewModel = LEDClient()
+    var lightText by remember { mutableStateOf("Turn LEDs off") }
+    var selectedController by remember { mutableStateOf(LEDController.LASER) }
+    var lightToggle = false
+
+    Row( modifier = Modifier
+        .fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center) {
+        Button(onClick = {
+            lightText = if (lightToggle) "Turn LEDs off" else "Turn LEDs on"
+            viewModel.toggleLEDsOn(selectedController, lightToggle)
+            lightToggle = !lightToggle
+        },
+            modifier = Modifier
+                .scale(1f)
+                .weight(1f)
+                .padding(8.dp)
+                .wrapContentSize()) {
+            Text(text = lightText)
+        }
+        Button(onClick = {
+             viewModel.setPlaylist(selectedController, AnimationStates.IDLE)
+        },
+            modifier = Modifier
+                .scale(1f)
+                .weight(1f)
+                .padding(8.dp)
+                .wrapContentSize()) {
+            Text(text = "Force Idle anim")
+        }
+        Button(onClick = {
+             viewModel.restartController(selectedController)
+        },
+            modifier = Modifier
+                .scale(1f)
+                .weight(1f)
+                .padding(8.dp)
+                .wrapContentSize()) {
+            Text(text = "Restart controller")
+        }
+    }
 }
 
 // Preview the UI
 @Preview
 @Composable
 fun PreviewMyButtonWithViewModel() {
-    MyButtonWithViewModel()
+    MyButtonWithViewModel(LEDClient())
 }
 
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview() {
     ProjectlucianTheme {
-        UI("Lucian", modifier = Modifier
+        UI(modifier = Modifier
             .background(Color.Black)
             .padding(16.dp)
             .background(Color.Green));
@@ -203,34 +190,50 @@ fun onNightModeChange(enabled: Boolean) {
 fun StatusIndicators() {
     val viewModel = LEDClient()
     val coroutineScope = rememberCoroutineScope()
-    val requestResult by viewModel.requestResult.collectAsState()
-    var statusText by remember { mutableStateOf("") }
+    val requestResult by viewModel.getAllRequestResult.collectAsState()
+    val statusText by viewModel.statusMessage.collectAsState("");
+    val map = mutableMapOf<LEDController, GetRequestResult>()
+    var statusMaps by remember { mutableStateOf(map) }
 
     LaunchedEffect(Unit) {
         while (true) {
             delay(5000) // Delay between button clicks (5 seconds in this example)
             coroutineScope.launch {
-                // TODO: Get status of all controllers
-                viewModel.getState(LEDController.LASER)
+                viewModel.getAllStates()
             }
         }
     }
 
     when (val result = requestResult) {
-        is RequestResult.Success -> {
+        is GetAllRequestResult.Success -> {
             // Handle success case
-            statusText = result.data.toString()
-        }
-        is RequestResult.Error -> {
-            // Handle error case
-            statusText = result.error.message ?: "Unknown error occurred"
+            statusMaps = result.data
         }
         else -> {
         }
     }
 
-    Text(
-        modifier = Modifier.padding(16.dp),
-        text = statusText
-    )
+    Column(verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.wrapContentSize()) {
+        Text(text = statusText)
+        for ((controller, ledResult) in statusMaps.entries) {
+            Row(modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.1f),
+                horizontalArrangement = Arrangement.Center) {
+                Text(text = controller.name)
+                val text = when (ledResult) {
+                    is GetRequestResult.Success -> {
+                        // Handle success case
+                        ledResult.data.toString()
+                    }
+                    is GetRequestResult.Error -> {
+                        ledResult.error.message ?: "Unknown error occurred"
+                    }
+                }
+                Text(text = text)
+            }
+        }
+    }
 }

@@ -6,6 +6,6 @@ package com.kikkia.project_lucian.enums
 enum class AnimationStates(val playlistId: Int) {
     IDLE(1),
     LASER(2),
-    ULTIMATE(3),
-    BIGSHOT(4)
+    BIGSHOT(3),
+    ULTIMATE(4)
 }
