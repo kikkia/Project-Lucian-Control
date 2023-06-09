@@ -20,7 +20,7 @@ data class LEDState(val controller: LEDController,
         }
 
         fun blank() : LEDState {
-            return LEDState(LEDController.LASER, 0, false, 0, false)
+            return LEDState(LEDController.REVOLVER, 0, false, 0, false)
         }
     }
 }

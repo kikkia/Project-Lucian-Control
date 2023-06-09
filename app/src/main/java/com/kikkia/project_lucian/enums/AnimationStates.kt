@@ -7,5 +7,6 @@ enum class AnimationStates(val playlistId: Int) {
     IDLE(1),
     LASER(2),
     BIGSHOT(3),
-    ULTIMATE(4)
+    ULTIMATE(4),
+    TWOSHOT(5),
 }

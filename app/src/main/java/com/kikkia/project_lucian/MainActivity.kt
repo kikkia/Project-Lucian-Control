@@ -8,14 +8,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -87,34 +91,41 @@ fun MyButtonWithViewModel(viewModel: LEDClient) {
 @Composable
 fun ImageButtons(client: LEDClient) {
     val imageList = listOf(
-        Pair(R.drawable.lightslinger, AnimationStates.IDLE),
+        Pair(R.drawable.lightslinger, AnimationStates.TWOSHOT),
         Pair(R.drawable.piercing_light, AnimationStates.LASER),
         Pair(R.drawable.ardent_blaze, AnimationStates.BIGSHOT),
         Pair(R.drawable.the_culling, AnimationStates.ULTIMATE)
     )
 
-    Row(
+    Column(horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxHeight(0.1f),
-        horizontalArrangement = Arrangement.Center
-    ) {
-        for (pair in imageList) {
-            Image(
-                painter = painterResource(id = pair.first),
-                contentDescription = null,
-                modifier = Modifier
-                    .scale(3f)
-                    .weight(1f)
-                    .padding(8.dp)
-                    .wrapContentSize()
-                    .clickable {
-                        for (controller in LEDController.values()) {
-                            client.setPlaylist(controller, pair.second)
-                        }
-                    },
-                contentScale = ContentScale.Fit,
-            )
+            .wrapContentSize()
+            .fillMaxWidth()) {
+        Text(text = "Lucian abilities")
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.1f)
+                .wrapContentSize(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            for (pair in imageList) {
+                Image(
+                    painter = painterResource(id = pair.first),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .scale(3f)
+                        .weight(1f)
+                        .padding(8.dp)
+                        .wrapContentSize()
+                        .clickable {
+                            for (controller in LEDController.values()) {
+                                client.setPlaylist(controller, pair.second)
+                            }
+                        },
+                    contentScale = ContentScale.Fit,
+                )
+            }
         }
     }
 }
@@ -123,14 +134,15 @@ fun ImageButtons(client: LEDClient) {
 fun basicControlButtons() {
     val viewModel = LEDClient()
     var lightText by remember { mutableStateOf("Turn LEDs off") }
-    var selectedController by remember { mutableStateOf(LEDController.LASER) }
+    var selectedController by remember { mutableStateOf(LEDController.REVOLVER) }
+    var brightness by remember { mutableStateOf(128.0f) }
     var lightToggle = false
 
     Row( modifier = Modifier
         .fillMaxWidth(),
         horizontalArrangement = Arrangement.Center) {
         Button(onClick = {
-            lightText = if (lightToggle) "Turn LEDs off" else "Turn LEDs on"
+            lightText = if (!lightToggle) "Turn LEDs off" else "Turn LEDs on"
             viewModel.toggleLEDsOn(selectedController, lightToggle)
             lightToggle = !lightToggle
         },
@@ -162,6 +174,23 @@ fun basicControlButtons() {
             Text(text = "Restart controller")
         }
     }
+    Column(verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .wrapContentSize()
+            .fillMaxWidth()) {
+        Text(text = "Brightness control")
+        Text(text = brightness.toInt().toString())
+        Row(modifier = Modifier
+            .fillMaxWidth(0.9f)
+            .fillMaxHeight(0.1f),
+            horizontalArrangement = Arrangement.Center) {
+            Slider(value = brightness, onValueChange = {it -> brightness = it}, steps = 255, valueRange = 0f..255f)
+        }
+        Button(onClick = { viewModel.setLEDBrightness(selectedController, brightness.toInt())}) {
+            Text(text = "Set brightness")
+        }
+    }
 }
 
 // Preview the UI
@@ -175,15 +204,13 @@ fun PreviewMyButtonWithViewModel() {
 @Composable
 fun GreetingPreview() {
     ProjectlucianTheme {
-        UI(modifier = Modifier
-            .background(Color.Black)
-            .padding(16.dp)
-            .background(Color.Green));
+        UI(
+            modifier = Modifier
+                .background(Color.Black)
+                .padding(16.dp)
+                .background(Color.Green)
+        );
     }
-}
-
-fun onNightModeChange(enabled: Boolean) {
-
 }
 
 @Composable
@@ -191,13 +218,14 @@ fun StatusIndicators() {
     val viewModel = LEDClient()
     val coroutineScope = rememberCoroutineScope()
     val requestResult by viewModel.getAllRequestResult.collectAsState()
-    val statusText by viewModel.statusMessage.collectAsState("");
-    val map = mutableMapOf<LEDController, GetRequestResult>()
-    var statusMaps by remember { mutableStateOf(map) }
+    val statusMap = mutableMapOf<LEDController, GetRequestResult>()
+    var statusMapState by remember { mutableStateOf(statusMap) }
+    val brightnessMap = mutableMapOf<LEDController, Int>()
+    var brightnessMapState by remember { mutableStateOf(brightnessMap) }
 
     LaunchedEffect(Unit) {
         while (true) {
-            delay(5000) // Delay between button clicks (5 seconds in this example)
+            delay(1) // Delay between button clicks (5 seconds in this example)
             coroutineScope.launch {
                 viewModel.getAllStates()
             }
@@ -207,7 +235,7 @@ fun StatusIndicators() {
     when (val result = requestResult) {
         is GetAllRequestResult.Success -> {
             // Handle success case
-            statusMaps = result.data
+            statusMapState = result.data
         }
         else -> {
         }
@@ -216,23 +244,29 @@ fun StatusIndicators() {
     Column(verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.wrapContentSize()) {
-        Text(text = statusText)
-        for ((controller, ledResult) in statusMaps.entries) {
+        for ((controller, ledResult) in statusMapState.entries) {
+            var statusText = ""
             Row(modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.1f),
+                .fillMaxHeight(0.1f)
+                .wrapContentSize(),
                 horizontalArrangement = Arrangement.Center) {
-                Text(text = controller.name)
-                val text = when (ledResult) {
+                Text(text = controller.name + ": ")
+                when (ledResult) {
                     is GetRequestResult.Success -> {
                         // Handle success case
-                        ledResult.data.toString()
+                        statusText =ledResult.data.toString()
+                        Slider(value = ledResult.data.brightness.toFloat(),
+                            onValueChange = {br -> brightnessMap[controller] = br.toInt()},
+                            onValueChangeFinished = {viewModel.setLEDBrightness(controller, brightnessMap[controller]!!)})
                     }
                     is GetRequestResult.Error -> {
-                        ledResult.error.message ?: "Unknown error occurred"
+                        statusText = ledResult.error.message ?: "Unknown error occurred"
                     }
                 }
-                Text(text = text)
+            }
+            Column() {
+                Text(text = statusText)
             }
         }
     }
