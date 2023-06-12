@@ -1,5 +1,6 @@
 package com.kikkia.project_lucian.clients
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kikkia.project_lucian.enums.AnimationStates
@@ -65,6 +66,7 @@ class LEDClient : ViewModel() {
                     httpClient.newCall(request).execute()
                 } catch (e: Exception) {
                     _statusMessage.value = e.message!!
+                    Log.e("toggleLEDs", e.message!!)
                 }
                 getAllStates()
             }
@@ -88,6 +90,7 @@ class LEDClient : ViewModel() {
                     httpClient.newCall(request).execute()
                 } catch (e: Exception) {
                     _statusMessage.value = e.message!!
+                    Log.e("setLEDBrightness", e.message!!)
                 }
                 getAllStates()
             }
@@ -111,6 +114,7 @@ class LEDClient : ViewModel() {
                     httpClient.newCall(request).execute()
                 } catch (e: Exception) {
                     _statusMessage.value = e.message!!
+                    Log.e("setPlaylist", e.message!!)
                 }
                 getAllStates()
             }
@@ -134,6 +138,7 @@ class LEDClient : ViewModel() {
                     httpClient.newCall(request).execute()
                 } catch (e: Exception) {
                     _statusMessage.value = e.message!!
+                    Log.e("restartController", e.message!!)
                 }
                 getAllStates()
             }

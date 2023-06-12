@@ -69,27 +69,45 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun UI(modifier: Modifier = Modifier) {
-    Column(verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.fillMaxSize()) {
         MyButtonWithViewModel(LEDClient())
-    }
 }
 
 // Create a Composable function for the UI
 @Composable
 fun MyButtonWithViewModel(viewModel: LEDClient) {
+    var selectedController by remember { mutableStateOf(LEDController.REVOLVER) }
+    var all by remember { mutableStateOf(true) }
     // Compose UI components
     Column( modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.Center) {
-        ImageButtons(viewModel)
-        basicControlButtons()
+
+        Column(verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally) {
+
+            Row(
+                modifier = Modifier.fillMaxWidth(.9f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+            for (controller in LEDController.values()) {
+
+                    RadioButton(selected = selectedController == controller && !all, onClick = {
+                        selectedController = controller
+                        all = false
+                    })
+                    Text(text = controller.name)
+                }
+                RadioButton(selected = all, onClick = { all = true })
+                Text(text = "All")
+            }
+        }
+        ImageButtons(viewModel, selectedController, all)
+        basicControlButtons(selectedController, all)
         StatusIndicators()
     }
 }
 
 @Composable
-fun ImageButtons(client: LEDClient) {
+fun ImageButtons(client: LEDClient, selectedController: LEDController, all: Boolean) {
     val imageList = listOf(
         Pair(R.drawable.lightslinger, AnimationStates.TWOSHOT),
         Pair(R.drawable.piercing_light, AnimationStates.LASER),
@@ -119,8 +137,12 @@ fun ImageButtons(client: LEDClient) {
                         .padding(8.dp)
                         .wrapContentSize()
                         .clickable {
-                            for (controller in LEDController.values()) {
-                                client.setPlaylist(controller, pair.second)
+                            if (all) {
+                                for (controller in LEDController.values()) {
+                                    client.setPlaylist(controller, pair.second)
+                                }
+                            } else {
+                                client.setPlaylist(selectedController, pair.second)
                             }
                         },
                     contentScale = ContentScale.Fit,
@@ -131,10 +153,9 @@ fun ImageButtons(client: LEDClient) {
 }
 
 @Composable
-fun basicControlButtons() {
+fun basicControlButtons(selectedController: LEDController, all: Boolean) {
     val viewModel = LEDClient()
     var lightText by remember { mutableStateOf("Turn LEDs off") }
-    var selectedController by remember { mutableStateOf(LEDController.REVOLVER) }
     var brightness by remember { mutableStateOf(128.0f) }
     var lightToggle = false
 
@@ -143,7 +164,13 @@ fun basicControlButtons() {
         horizontalArrangement = Arrangement.Center) {
         Button(onClick = {
             lightText = if (!lightToggle) "Turn LEDs off" else "Turn LEDs on"
-            viewModel.toggleLEDsOn(selectedController, lightToggle)
+            if (all) {
+                for (controller in LEDController.values()) {
+                    viewModel.toggleLEDsOn(controller, lightToggle)
+                }
+            } else {
+                viewModel.toggleLEDsOn(selectedController, lightToggle)
+            }
             lightToggle = !lightToggle
         },
             modifier = Modifier
@@ -154,7 +181,13 @@ fun basicControlButtons() {
             Text(text = lightText)
         }
         Button(onClick = {
-             viewModel.setPlaylist(selectedController, AnimationStates.IDLE)
+            if (all) {
+                for (controller in LEDController.values()) {
+                    viewModel.setPlaylist(controller, AnimationStates.IDLE)
+                }
+            } else {
+                viewModel.setPlaylist(selectedController, AnimationStates.IDLE)
+            }
         },
             modifier = Modifier
                 .scale(1f)
@@ -164,7 +197,13 @@ fun basicControlButtons() {
             Text(text = "Force Idle anim")
         }
         Button(onClick = {
-             viewModel.restartController(selectedController)
+            if (all) {
+                for (controller in LEDController.values()) {
+                    viewModel.restartController(controller)
+                }
+            } else {
+                viewModel.restartController(selectedController)
+            }
         },
             modifier = Modifier
                 .scale(1f)
@@ -187,7 +226,15 @@ fun basicControlButtons() {
             horizontalArrangement = Arrangement.Center) {
             Slider(value = brightness, onValueChange = {it -> brightness = it}, steps = 255, valueRange = 0f..255f)
         }
-        Button(onClick = { viewModel.setLEDBrightness(selectedController, brightness.toInt())}) {
+        Button(onClick = {
+            if (all) {
+                for(controller in LEDController.values()) {
+                    viewModel.setLEDBrightness(controller, brightness.toInt())
+                }
+            } else {
+                viewModel.setLEDBrightness(selectedController, brightness.toInt())
+            }
+        }) {
             Text(text = "Set brightness")
         }
     }
