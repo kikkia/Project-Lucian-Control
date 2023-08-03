@@ -1,6 +1,8 @@
 package com.kikkia.project_lucian.clients
 
 import android.util.Log
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kikkia.project_lucian.enums.AnimationStates
@@ -17,6 +19,7 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.lang.Exception
+import java.util.logging.Logger
 
 sealed class GetRequestResult {
     data class Success(val data: LEDState) : GetRequestResult()
@@ -32,7 +35,17 @@ class LEDClient : ViewModel() {
     // Create a state for the response message
     private val _getAllRequestResult = MutableStateFlow<GetAllRequestResult?>(null)
     val getAllRequestResult: StateFlow<GetAllRequestResult?> = _getAllRequestResult
+
+    private val _getLaserRequestResult = MutableStateFlow<GetRequestResult?>(null)
+    val getLaserRequestResult: StateFlow<GetRequestResult?> = _getLaserRequestResult
+    private val _getRevolverRequestResult = MutableStateFlow<GetRequestResult?>(null)
+    val getRevolverRequestResult: StateFlow<GetRequestResult?> = _getRevolverRequestResult
+    private val _getHelmetRequestResult = MutableStateFlow<GetRequestResult?>(null)
+    val getHelmetRequestResult: StateFlow<GetRequestResult?> = _getHelmetRequestResult
+
     private val _statusMessage = MutableStateFlow("")
+    private val _getAllRequestResultTest = mutableStateMapOf<LEDController, GetRequestResult>()
+    val testState: SnapshotStateMap<LEDController, GetRequestResult> get() = _getAllRequestResultTest
     val statusMessage = _statusMessage
     val httpClient = OkHttpClient()
 
@@ -105,13 +118,14 @@ class LEDClient : ViewModel() {
             withContext(Dispatchers.IO) {
                 try {
                     val json = JSONObject()
-                    json.put("pl", playlist.playlistId)
+                    json.put("ps", playlist.playlistId)
                     val request: Request = Request.Builder()
                         .url(controller.getJsonApiPath())
                         .post(json.toString().toRequestBody())
                         .build()
 
-                    httpClient.newCall(request).execute()
+                    val response = httpClient.newCall(request).execute()
+                    Logger.getLogger("Test").warning(response.body.toString())
                 } catch (e: Exception) {
                     _statusMessage.value = e.message!!
                     Log.e("setPlaylist", e.message!!)
@@ -150,7 +164,7 @@ class LEDClient : ViewModel() {
      */
     fun getAllStates() {
         viewModelScope.launch {
-            val map: MutableMap<LEDController, GetRequestResult> = mutableMapOf()
+            val map: MutableMap<LEDController, GetRequestResult> = mutableStateMapOf()
             withContext(Dispatchers.IO) {
                 for (controller in LEDController.values()) {
                     try {
@@ -160,7 +174,9 @@ class LEDClient : ViewModel() {
                         map[controller] = GetRequestResult.Error(e)
                     }
                 }
-                _getAllRequestResult.value = GetAllRequestResult.Success(map)
+                _getHelmetRequestResult.value = map[LEDController.HELMET]
+                _getLaserRequestResult.value = map[LEDController.LASER]
+                _getRevolverRequestResult.value = map[LEDController.REVOLVER]
             }
         }
     }
