@@ -1,7 +1,10 @@
 package com.kikkia.project_lucian.clients
 
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kikkia.project_lucian.models.APIEvent
 import io.nats.client.Connection
 import io.nats.client.Nats
 import io.nats.client.Options
@@ -19,6 +22,9 @@ class NatsClient : ViewModel() {
     lateinit var natsConn: Connection
     var natsEnabled = MutableStateFlow<Boolean>(false)
     val logger = Logger.getLogger(this.javaClass.name)
+    private val statusMessage = MutableLiveData<APIEvent<String>>()
+    val message: LiveData<APIEvent<String>>
+        get() = statusMessage
 
     fun toggleNats(state: Boolean) {
         if (natsEnabled.value == state) {
@@ -38,6 +44,7 @@ class NatsClient : ViewModel() {
                         .maxReconnects(-1).build()
                     natsConn = Nats.connect(o)
                     logger.info("Connected to Nats")
+                    statusMessage.postValue(APIEvent("Connected to NATS"))
 
                     val commandDispatcher = natsConn.createDispatcher {
                         if (natsEnabled.value) {

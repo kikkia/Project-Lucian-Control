@@ -1,6 +1,7 @@
 package com.kikkia.project_lucian
 
 import android.os.Bundle
+import android.widget.Toast
 import android.widget.ToggleButton
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -38,10 +39,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Observer
 import com.kikkia.project_lucian.clients.GetRequestResult
 import com.kikkia.project_lucian.clients.LEDClient
 import com.kikkia.project_lucian.clients.NatsClient
 import com.kikkia.project_lucian.enums.AnimationStates
+import com.kikkia.project_lucian.enums.ColorProfile
 import com.kikkia.project_lucian.enums.LEDController
 import com.kikkia.project_lucian.ui.theme.ProjectlucianTheme
 import kotlinx.coroutines.delay
@@ -50,6 +53,19 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val apiModel = LEDClient()
+        apiModel.message.observe(this, Observer {
+            it.getContent()?.let {
+                Toast.makeText(this, it, Toast.LENGTH_SHORT).show()
+            }
+        })
+
+        val natsModel = NatsClient()
+        natsModel.message.observe(this, Observer {
+            it.getContent()?.let {
+                Toast.makeText(this, it, Toast.LENGTH_SHORT).show()
+            }
+        })
         setContent {
             ProjectlucianTheme {
                 // A surface container using the 'background' color from the theme
@@ -57,7 +73,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    UI()
+                    UI(apiModel, natsModel)
                 }
             }
         }
@@ -65,20 +81,20 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun UI(modifier: Modifier = Modifier) {
-        MyButtonWithViewModel(LEDClient(), NatsClient())
+fun UI(apiModel: LEDClient, natsModel: NatsClient, modifier: Modifier = Modifier) {
+        MyButtonWithViewModel(apiModel, natsModel)
 }
 
 // Create a Composable function for the UI
 @Composable
-fun MyButtonWithViewModel(viewModel: LEDClient, natsModel: NatsClient) {
+fun MyButtonWithViewModel(apiModel: LEDClient, natsModel: NatsClient) {
     var selectedController by remember { mutableStateOf(LEDController.REVOLVER) }
     var all by remember { mutableStateOf(true) }
     var natsEnabled by remember { mutableStateOf(false) }
     // Compose UI components
     Column( modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.Center) {
-
+        colorButtons(apiModel, selectedController, all)
         Column(verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally) {
             Row(
@@ -110,9 +126,44 @@ fun MyButtonWithViewModel(viewModel: LEDClient, natsModel: NatsClient) {
                 Text(text = "All")
             }
         }
-        ImageButtons(viewModel, selectedController, all)
-        basicControlButtons(selectedController, all, viewModel)
-        StatusIndicators(viewModel)
+        ImageButtons(apiModel, selectedController, all)
+        basicControlButtons(selectedController, all, apiModel)
+        StatusIndicators(apiModel)
+    }
+}
+
+@Composable
+fun colorButtons(viewModel: LEDClient, selectedController: LEDController, all: Boolean) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .wrapContentSize()
+            .fillMaxWidth()) {
+        Text(text = "Color scheme")
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.1f)
+                .wrapContentSize(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            for (color in ColorProfile.values()) {
+                Button(onClick = {
+                    if (all) {
+                        for (controller in LEDController.values()) {
+                            if (controller == LEDController.LASER) {
+                                viewModel.setColor(controller, color.sec)
+                            } else {
+                                viewModel.setColor(controller, color.pri)
+                            }
+                        }
+                    } else {
+                        viewModel.setColor(selectedController, color.pri)
+                    }
+                }) {
+                    Text(color.name)
+                }
+            }
+        }
     }
 }
 
@@ -129,7 +180,6 @@ fun ImageButtons(client: LEDClient, selectedController: LEDController, all: Bool
         modifier = Modifier
             .wrapContentSize()
             .fillMaxWidth()) {
-        Text(text = "Lucian abilities")
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -261,6 +311,8 @@ fun PreviewMyButtonWithViewModel() {
 fun GreetingPreview() {
     ProjectlucianTheme {
         UI(
+            LEDClient(),
+            NatsClient(),
             modifier = Modifier
                 .background(Color.Black)
                 .padding(16.dp)
@@ -348,9 +400,6 @@ fun StatusIndicators(ledClient: LEDClient) {
                 else {
                     Text("Null result")
                 }
-            }
-            Column() {
-                Text(text = statusText)
             }
         }
     }

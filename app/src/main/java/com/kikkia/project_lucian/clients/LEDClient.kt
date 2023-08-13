@@ -3,11 +3,15 @@ package com.kikkia.project_lucian.clients
 import android.util.Log
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.snapshots.SnapshotStateMap
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kikkia.project_lucian.enums.AnimationStates
 import com.kikkia.project_lucian.enums.LEDController
+import com.kikkia.project_lucian.models.APIEvent
 import com.kikkia.project_lucian.models.LEDState
+import com.kikkia.project_lucian.models.RGB
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +21,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
 import org.json.JSONObject
 import java.lang.Exception
 import java.util.logging.Logger
@@ -43,10 +48,11 @@ class LEDClient : ViewModel() {
     private val _getHelmetRequestResult = MutableStateFlow<GetRequestResult?>(null)
     val getHelmetRequestResult: StateFlow<GetRequestResult?> = _getHelmetRequestResult
 
-    private val _statusMessage = MutableStateFlow("")
     private val _getAllRequestResultTest = mutableStateMapOf<LEDController, GetRequestResult>()
     val testState: SnapshotStateMap<LEDController, GetRequestResult> get() = _getAllRequestResultTest
-    val statusMessage = _statusMessage
+    private val statusMessage = MutableLiveData<APIEvent<String>>()
+    val message: LiveData<APIEvent<String>>
+        get() = statusMessage
     val httpClient = OkHttpClient()
 
     /**
@@ -78,7 +84,7 @@ class LEDClient : ViewModel() {
 
                     httpClient.newCall(request).execute()
                 } catch (e: Exception) {
-                    _statusMessage.value = e.message!!
+                    statusMessage.postValue(APIEvent(e.message!!))
                     Log.e("toggleLEDs", e.message!!)
                 }
                 getAllStates()
@@ -102,7 +108,37 @@ class LEDClient : ViewModel() {
 
                     httpClient.newCall(request).execute()
                 } catch (e: Exception) {
-                    _statusMessage.value = e.message!!
+                    statusMessage.postValue(APIEvent(e.message!!))
+                    Log.e("setLEDBrightness", e.message!!)
+                }
+                getAllStates()
+            }
+        }
+    }
+
+    fun setColor(controller: LEDController, color: RGB) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    val json = JSONObject()
+                    val jsonArr = JSONArray()
+                    for (i in 0..controller.numSegments) {
+                        val segJSON = JSONObject()
+                        segJSON.put("id", i)
+                        segJSON.put("col", JSONArray().put(color.r).put(color.g).put(color.b))
+                        jsonArr.put(segJSON)
+                    }
+                    json.put("seg", jsonArr)
+
+                    val request: Request = Request.Builder()
+                        .url(controller.getJsonApiPath())
+                        .post(json.toString().toRequestBody())
+                        .build()
+
+                    httpClient.newCall(request).execute()
+                }
+                catch (e: Exception) {
+                    statusMessage.postValue(APIEvent(e.message!!))
                     Log.e("setLEDBrightness", e.message!!)
                 }
                 getAllStates()
@@ -127,7 +163,7 @@ class LEDClient : ViewModel() {
                     val response = httpClient.newCall(request).execute()
                     Logger.getLogger("Test").warning(response.body.toString())
                 } catch (e: Exception) {
-                    _statusMessage.value = e.message!!
+                    statusMessage.postValue(APIEvent(e.message!!))
                     Log.e("setPlaylist", e.message!!)
                 }
                 getAllStates()
@@ -151,7 +187,7 @@ class LEDClient : ViewModel() {
 
                     httpClient.newCall(request).execute()
                 } catch (e: Exception) {
-                    _statusMessage.value = e.message!!
+                    statusMessage.postValue(APIEvent(e.message!!))
                     Log.e("restartController", e.message!!)
                 }
                 getAllStates()
