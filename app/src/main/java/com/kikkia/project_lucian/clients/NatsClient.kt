@@ -5,6 +5,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kikkia.project_lucian.models.APIEvent
+import com.kikkia.project_lucian.models.NATSCommand
 import io.nats.client.Connection
 import io.nats.client.Nats
 import io.nats.client.Options
@@ -25,6 +26,9 @@ class NatsClient : ViewModel() {
     private val statusMessage = MutableLiveData<APIEvent<String>>()
     val message: LiveData<APIEvent<String>>
         get() = statusMessage
+    private val natsCommand = MutableLiveData<APIEvent<NATSCommand>>()
+    val command: LiveData<APIEvent<NATSCommand>>
+        get() = natsCommand
 
     fun toggleNats(state: Boolean) {
         if (natsEnabled.value == state) {

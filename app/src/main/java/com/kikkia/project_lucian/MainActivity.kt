@@ -1,6 +1,10 @@
 package com.kikkia.project_lucian
 
+import android.content.res.AssetFileDescriptor
+import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Bundle
+import android.util.LruCache
 import android.widget.Toast
 import android.widget.ToggleButton
 import androidx.activity.ComponentActivity
@@ -26,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.currentCompositionLocalContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -46,9 +52,13 @@ import com.kikkia.project_lucian.clients.NatsClient
 import com.kikkia.project_lucian.enums.AnimationStates
 import com.kikkia.project_lucian.enums.ColorProfile
 import com.kikkia.project_lucian.enums.LEDController
+import com.kikkia.project_lucian.enums.Sounds
 import com.kikkia.project_lucian.ui.theme.ProjectlucianTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Random
+import java.util.logging.Logger
+import kotlin.coroutines.coroutineContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -94,6 +104,7 @@ fun MyButtonWithViewModel(apiModel: LEDClient, natsModel: NatsClient) {
     // Compose UI components
     Column( modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.Center) {
+        audioButtons()
         colorButtons(apiModel, selectedController, all)
         Column(verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally) {
@@ -132,6 +143,57 @@ fun MyButtonWithViewModel(apiModel: LEDClient, natsModel: NatsClient) {
     }
 }
 
+
+@Composable
+fun audioButtons() {
+    val context = LocalContext.current
+    val assetManager = context.assets
+    val mediaPlayer = MediaPlayer()
+    val lastPlayed = mapOf(Pair(Sounds.ATTACK, LruCache<Int, Boolean>(5)),
+        Pair(Sounds.MOVE, LruCache(5)),
+        Pair(Sounds.ENCOUNTER, LruCache(5)))
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .wrapContentSize()
+            .fillMaxWidth()
+    ) {
+        Text(text = "Voice Lines")
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.1f)
+                .wrapContentSize(),
+        horizontalArrangement = Arrangement.Center
+        ) {
+            for (sound in Sounds.values()) {
+                Button(modifier = Modifier
+                    .padding(8.dp),
+                    onClick = {
+                        val audioFiles = assetManager.list(sound.path)
+                        if (!audioFiles.isNullOrEmpty() && !mediaPlayer.isPlaying) {
+                            var randomIndex = -1
+                            while (randomIndex < 0 || lastPlayed[sound]!!.get(randomIndex) != null) {
+                                randomIndex = Random().nextInt(audioFiles.size)
+                            }
+                            lastPlayed[sound]!!.put(randomIndex, true)
+                            val randomAudioFile = audioFiles[randomIndex]
+                            Logger.getLogger("AudioButton").info("Playing: $randomIndex")
+
+                            val afd = assetManager.openFd("${sound.path}/$randomAudioFile")
+                            mediaPlayer.reset()
+                            mediaPlayer.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                            mediaPlayer.prepare()
+                            mediaPlayer.start()
+                        }
+                    }) {
+                    Text(sound.name)
+                }
+            }
+        }
+    }
+}
 @Composable
 fun colorButtons(viewModel: LEDClient, selectedController: LEDController, all: Boolean) {
     Column(horizontalAlignment = Alignment.CenterHorizontally,
@@ -175,6 +237,7 @@ fun ImageButtons(client: LEDClient, selectedController: LEDController, all: Bool
         Pair(R.drawable.ardent_blaze, AnimationStates.BIGSHOT),
         Pair(R.drawable.the_culling, AnimationStates.ULTIMATE)
     )
+    val context = LocalContext.current
 
     Column(horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -203,6 +266,17 @@ fun ImageButtons(client: LEDClient, selectedController: LEDController, all: Bool
                                 }
                             } else {
                                 client.setPlaylist(selectedController, pair.second)
+                            }
+
+                            val mp = MediaPlayer()
+                            val afd: AssetFileDescriptor =
+                                context.resources.openRawResourceFd(pair.second.sfxId)
+                            mp.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                            mp.prepare()
+                            mp.start()
+
+                            mp.setOnCompletionListener { player ->
+                                player.release()
                             }
                         },
                     contentScale = ContentScale.Fit,
@@ -382,14 +456,6 @@ fun StatusIndicators(ledClient: LEDClient) {
                         is GetRequestResult.Success -> {
                             // Handle success case
                             statusText = ledResult.data.toString()
-                            Slider(value = ledResult.data.brightness.toFloat(),
-                                onValueChange = { br -> brightnessMapState[controller] = br.toInt() },
-                                onValueChangeFinished = {
-                                    ledClient.setLEDBrightness(
-                                        controller,
-                                        brightnessMapState[controller]!!
-                                    )
-                                })
                         }
 
                         is GetRequestResult.Error -> {

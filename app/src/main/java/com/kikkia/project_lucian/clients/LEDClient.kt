@@ -1,5 +1,6 @@
 package com.kikkia.project_lucian.clients
 
+import android.media.MediaPlayer
 import android.util.Log
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -7,6 +8,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kikkia.project_lucian.R
 import com.kikkia.project_lucian.enums.AnimationStates
 import com.kikkia.project_lucian.enums.LEDController
 import com.kikkia.project_lucian.models.APIEvent
@@ -19,11 +21,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
-import java.lang.Exception
 import java.util.logging.Logger
 
 sealed class GetRequestResult {
